@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Bell, CalendarDays, ChevronDown, Clock3, Filter, Flame, Menu, Search, Settings2, Star, Trophy, X } from 'lucide-react'
+import { Bell, CalendarDays, ChevronDown, Clock3, Filter, Flame, Menu, Moon, Search, Settings2, Star, Sun, Trophy, X } from 'lucide-react'
 
 type Match = { id: number; time: string; state: string; home: string; away: string; homeScore?: number; awayScore?: number; league: string; color: string; hot?: boolean }
 
@@ -27,6 +27,8 @@ export default function Page() {
   const [filter, setFilter] = useState('Todos')
   const [search, setSearch] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
+  const [darkMode, setDarkMode] = useState(false)
+  const [selectedMatch, setSelectedMatch] = useState<Match | null>(null)
   const visible = matches.filter((match) => {
     const byFilter = filter === 'Todos' || (filter === 'Ao vivo' && match.state === 'Ao vivo') || (filter === 'Próximos' && match.state === 'Em breve') || (filter === 'Encerrados' && match.state === 'Encerrado')
     const bySearch = `${match.home} ${match.away} ${match.league}`.toLowerCase().includes(search.toLowerCase())
@@ -34,11 +36,13 @@ export default function Page() {
   })
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell ${darkMode ? 'theme-dark' : ''}`}>
+      {selectedMatch && <div className="match-modal-backdrop" role="presentation" onClick={() => setSelectedMatch(null)}><section className="match-modal" role="dialog" aria-modal="true" aria-label={`Detalhes de ${selectedMatch.home} e ${selectedMatch.away}`} onClick={(event) => event.stopPropagation()}><button className="modal-close" onClick={() => setSelectedMatch(null)} aria-label="Fechar detalhes"><X size={18} /></button><div className="modal-kicker">{selectedMatch.state} · {selectedMatch.league}</div><h2>{selectedMatch.home} <span>vs</span> {selectedMatch.away}</h2><div className="pitch-wrap"><div className="pitch"><div className="pitch-box top" /><div className="pitch-circle" /><div className="pitch-box bottom" /><span className="event-marker marker-goal">68&apos;</span><span className="event-marker marker-foul">52&apos;</span></div></div><div className="pitch-legend"><span><i className="goal-dot" /> Gol · Pedro</span><span><i className="foul-dot" /> Falta · Mayke</span></div><p className="modal-note">Mapa de eventos da partida. Os lances aparecem conforme a fonte oficial atualiza o jogo.</p></section></div>}
+
       <header className="topbar">
         <div className="brand"><span className="brand-mark"><Trophy size={19} strokeWidth={2.5} /></span><span>Fut<span>Fly</span></span></div>
         <nav className="main-nav" aria-label="Navegação principal"><a className="active" href="#jogos">Jogos</a><a href="#competicoes">Competições</a><a href="#times">Meus times</a></nav>
-        <div className="top-actions"><button className="icon-button" aria-label="Notificações"><Bell size={19} /></button><button className="avatar" aria-label="Perfil">MS</button><button className="mobile-menu" onClick={() => setMenuOpen(!menuOpen)} aria-label="Abrir menu"><Menu size={22} /></button></div>
+        <div className="top-actions"><button className="icon-button" onClick={() => setDarkMode(!darkMode)} aria-label={darkMode ? 'Ativar modo claro' : 'Ativar modo escuro'}>{darkMode ? <Sun size={19} /> : <Moon size={19} />}</button><button className="icon-button" aria-label="Notificações"><Bell size={19} /></button><button className="avatar" aria-label="Perfil">MS</button><button className="mobile-menu" onClick={() => setMenuOpen(!menuOpen)} aria-label="Abrir menu"><Menu size={22} /></button></div>
       </header>
       {menuOpen && <div className="mobile-nav"><a href="#jogos">Jogos</a><a href="#competicoes">Competições</a><a href="#times">Meus times</a></div>}
 
@@ -48,7 +52,7 @@ export default function Page() {
         <section className="toolbar" id="jogos"><div className="tabs" role="tablist">{['Todos', 'Ao vivo', 'Próximos', 'Encerrados'].map((item) => <button key={item} className={filter === item ? 'tab active' : 'tab'} onClick={() => setFilter(item)}>{item}{item === 'Ao vivo' && <span className="tab-dot" />}</button>)}</div><div className="toolbar-actions"><label className="search-box"><Search size={17} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar time ou campeonato" aria-label="Buscar time ou campeonato" />{search && <button onClick={() => setSearch('')} aria-label="Limpar busca"><X size={14} /></button>}</label><button className="filter-button"><Filter size={16} /> Filtros <ChevronDown size={15} /></button></div></section>
 
         <div className="section-heading"><div><h2>Partidas de hoje</h2><p>Terça-feira, 29 de outubro <span>•</span> 12 jogos</p></div><button className="calendar-button"><CalendarDays size={17} /> Calendário</button></div>
-        <section className="match-grid">{visible.map((match) => <article className={`match-card ${match.state === 'Ao vivo' ? 'is-live' : ''}`} key={match.id}><div className="match-meta"><span className={match.state === 'Ao vivo' ? 'status live' : match.state === 'Encerrado' ? 'status ended' : 'status upcoming'}>{match.state === 'Ao vivo' && <i />}{match.state}</span><span>{match.league}</span>{match.hot && <Flame className="hot" size={15} fill="currentColor" />}</div><div className="match-teams"><div className="club"><TeamBadge name={match.home} color={match.color} /><strong>{match.home}</strong></div><div className="score"><b>{match.homeScore ?? match.time}</b>{match.homeScore !== undefined && <span>:</span>}<b>{match.awayScore ?? ''}</b></div><div className="club away"><TeamBadge name={match.away} color={match.color} /><strong>{match.away}</strong></div></div><div className="match-footer"><span><Clock3 size={14} /> {match.state === 'Ao vivo' ? '2º tempo · 68 min' : match.state === 'Encerrado' ? 'Finalizado' : `Hoje, ${match.time}`}</span><button aria-label={`Favoritar ${match.home} e ${match.away}`}><Star size={17} /></button></div></article>)}</section>
+        <section className="match-grid">{visible.map((match) => <article className={`match-card ${match.state === 'Ao vivo' ? 'is-live' : ''}`} key={match.id} onClick={() => setSelectedMatch(match)} tabIndex={0} onKeyDown={(event) => { if (event.key === 'Enter') setSelectedMatch(match) }}><div className="match-meta"><span className={match.state === 'Ao vivo' ? 'status live' : match.state === 'Encerrado' ? 'status ended' : 'status upcoming'}>{match.state === 'Ao vivo' && <i />}{match.state}</span><span>{match.league}</span>{match.hot && <Flame className="hot" size={15} fill="currentColor" />}</div><div className="match-teams"><div className="club"><TeamBadge name={match.home} color={match.color} /><strong>{match.home}</strong></div><div className="score"><b>{match.homeScore ?? match.time}</b>{match.homeScore !== undefined && <span>:</span>}<b>{match.awayScore ?? ''}</b></div><div className="club away"><TeamBadge name={match.away} color={match.color} /><strong>{match.away}</strong></div></div><div className="match-footer"><span><Clock3 size={14} /> {match.state === 'Ao vivo' ? '2º tempo · 68 min' : match.state === 'Encerrado' ? 'Finalizado' : `Hoje, ${match.time}`}</span><button aria-label={`Favoritar ${match.home} e ${match.away}`}><Star size={17} /></button></div></article>)}</section>
         {visible.length === 0 && <div className="empty-state">Nenhum jogo encontrado para sua busca.</div>}
 
         <section className="updates-layout"><div className="updates-panel"><div className="section-heading compact"><div><h2>Últimas atualizações</h2><p>O que está acontecendo agora</p></div><a href="#atualizacoes">Ver tudo <span>→</span></a></div><div className="updates-list">{updates.map((update) => <div className="update-item" key={update.minute + update.title}><div className="update-time">{update.minute}</div><div className="update-line" style={{ '--update-color': update.color } as React.CSSProperties} /><div className="update-content"><span className="update-tag" style={{ color: update.color, backgroundColor: `${update.color}12` }}>{update.team}</span><h3>{update.title}</h3><p>{update.text}</p></div></div>)}</div></div><aside className="follow-card"><div className="follow-icon"><Bell size={18} /></div><h2>Não perca nenhum lance</h2><p>Receba alertas dos seus times favoritos direto no celular.</p><button>Escolher meus times <span>→</span></button></aside></section>
