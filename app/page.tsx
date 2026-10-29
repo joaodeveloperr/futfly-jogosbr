@@ -1,26 +1,17 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Bell, CalendarDays, ChevronDown, Clock3, Filter, Flame, Menu, Moon, Search, Settings2, Star, Sun, Trophy, X } from 'lucide-react'
 
-type Match = { id: number; time: string; state: string; home: string; away: string; homeScore?: number; awayScore?: number; league: string; color: string; hot?: boolean }
+type MatchEvent = { type: string; minute?: number; team?: string; player: string }
+type Match = { id: number; utcDate: string; status: string; home: { name: string; crest: string | null }; away: { name: string; crest: string | null }; score: { fullTime?: { home: number | null; away: number | null }; duration?: string }; league: string; events: MatchEvent[] }
 
-const matches: Match[] = [
-  { id: 1, time: '18:30', state: 'Ao vivo', home: 'Flamengo', away: 'Palmeiras', homeScore: 2, awayScore: 1, league: 'Brasileirão', color: '#e63946', hot: true },
-  { id: 2, time: '20:00', state: 'Em breve', home: 'Manchester City', away: 'Real Madrid', league: 'Champions League', color: '#4b7bec' },
-  { id: 3, time: '20:30', state: 'Em breve', home: 'Corinthians', away: 'São Paulo', league: 'Paulistão', color: '#252525' },
-  { id: 4, time: '21:00', state: 'Em breve', home: 'Barcelona', away: 'Atlético de Madrid', league: 'La Liga', color: '#7b2cbf' },
-  { id: 5, time: '16:00', state: 'Encerrado', home: 'Liverpool', away: 'Arsenal', homeScore: 3, awayScore: 3, league: 'Premier League', color: '#d62828' },
-]
+const statusLabel: Record<string, string> = { IN_PLAY: 'Ao vivo', PAUSED: 'Intervalo', FINISHED: 'Encerrado', TIMED: 'Em breve', SCHEDULED: 'Em breve' }
 
-const updates = [
-  { minute: '68’', title: 'Gol do Flamengo!', text: 'Pedro marcou de cabeça após cruzamento de Arrascaeta.', team: 'Flamengo', color: '#e63946' },
-  { minute: '52’', title: 'Cartão amarelo', text: 'Mayke recebe cartão por falta dura no meio-campo.', team: 'Palmeiras', color: '#31a852' },
-  { minute: 'INTERVALO', title: 'Fim do primeiro tempo', text: 'Flamengo vai vencendo por 2 a 1 no Maracanã.', team: 'Flamengo', color: '#e63946' },
-]
+function formatTime(date: string) { return new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(new Date(date)) }
 
-function TeamBadge({ name, color }: { name: string; color: string }) {
-  return <div className="team-badge" style={{ '--team-color': color } as React.CSSProperties}>{name.slice(0, 1)}</div>
+function TeamBadge({ team }: { team: Match['home'] }) {
+  return team.crest ? <img className="team-badge crest" src={team.crest} alt={`Escudo do ${team.name}`} /> : <div className="team-badge">{team.name.slice(0, 1)}</div>
 }
 
 export default function Page() {
@@ -29,15 +20,38 @@ export default function Page() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [darkMode, setDarkMode] = useState(false)
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null)
+  const [matches, setMatches] = useState<Match[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    const loadMatches = async () => {
+      try {
+        const response = await fetch('/api/matches')
+        if (!response.ok) throw new Error('Não foi possível consultar os jogos.')
+        const data = await response.json()
+        setMatches(data.matches)
+      } catch (loadError) {
+        setError(loadError instanceof Error ? loadError.message : 'Falha ao carregar partidas.')
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadMatches()
+    const refresh = window.setInterval(loadMatches, 30000)
+    return () => window.clearInterval(refresh)
+  }, [])
+
   const visible = matches.filter((match) => {
-    const byFilter = filter === 'Todos' || (filter === 'Ao vivo' && match.state === 'Ao vivo') || (filter === 'Próximos' && match.state === 'Em breve') || (filter === 'Encerrados' && match.state === 'Encerrado')
-    const bySearch = `${match.home} ${match.away} ${match.league}`.toLowerCase().includes(search.toLowerCase())
+    const state = statusLabel[match.status] ?? match.status
+    const byFilter = filter === 'Todos' || (filter === 'Ao vivo' && ['Ao vivo', 'Intervalo'].includes(state)) || (filter === 'Próximos' && state === 'Em breve') || (filter === 'Encerrados' && state === 'Encerrado')
+    const bySearch = `${match.home.name} ${match.away.name} ${match.league}`.toLowerCase().includes(search.toLowerCase())
     return byFilter && bySearch
   })
 
   return (
     <main className={`app-shell ${darkMode ? 'theme-dark' : ''}`}>
-      {selectedMatch && <div className="match-modal-backdrop" role="presentation" onClick={() => setSelectedMatch(null)}><section className="match-modal" role="dialog" aria-modal="true" aria-label={`Detalhes de ${selectedMatch.home} e ${selectedMatch.away}`} onClick={(event) => event.stopPropagation()}><button className="modal-close" onClick={() => setSelectedMatch(null)} aria-label="Fechar detalhes"><X size={18} /></button><div className="modal-kicker">{selectedMatch.state} · {selectedMatch.league}</div><h2>{selectedMatch.home} <span>vs</span> {selectedMatch.away}</h2><div className="pitch-wrap"><div className="pitch"><div className="pitch-box top" /><div className="pitch-circle" /><div className="pitch-box bottom" /><span className="event-marker marker-goal">68&apos;</span><span className="event-marker marker-foul">52&apos;</span></div></div><div className="pitch-legend"><span><i className="goal-dot" /> Gol · Pedro</span><span><i className="foul-dot" /> Falta · Mayke</span></div><p className="modal-note">Mapa de eventos da partida. Os lances aparecem conforme a fonte oficial atualiza o jogo.</p></section></div>}
+      {selectedMatch && <div className="match-modal-backdrop" role="presentation" onClick={() => setSelectedMatch(null)}><section className="match-modal" role="dialog" aria-modal="true" aria-label={`Detalhes de ${selectedMatch.home.name} e ${selectedMatch.away.name}`} onClick={(event) => event.stopPropagation()}><button className="modal-close" onClick={() => setSelectedMatch(null)} aria-label="Fechar detalhes"><X size={18} /></button><div className="modal-kicker">{statusLabel[selectedMatch.status] ?? selectedMatch.status} · {selectedMatch.league}</div><h2>{selectedMatch.home.name} <span>vs</span> {selectedMatch.away.name}</h2><div className="pitch-wrap"><div className="pitch"><div className="pitch-box top" /><div className="pitch-circle" /><div className="pitch-box bottom" /></div></div><div className="real-events"><h3>Eventos oficiais</h3>{selectedMatch.events.length ? selectedMatch.events.map((event, index) => <div className="real-event" key={`${event.type}-${event.minute}-${index}`}><strong>{event.minute ?? '—'}&apos;</strong><span>{event.type === 'goal' ? 'Gol' : event.type === 'card' ? 'Cartão' : event.type}</span><p>{event.player}{event.team ? ` · ${event.team}` : ''}</p></div>) : <p className="modal-note">A fonte oficial não retornou eventos para esta partida.</p>}</div><p className="modal-note">A football-data.org informa o minuto e o tipo do lance, mas não fornece coordenadas no campo. Por isso o mapa não inventa uma posição.</p></section></div>}
 
       <header className="topbar">
         <div className="brand"><span className="brand-mark"><Trophy size={19} strokeWidth={2.5} /></span><span>Fut<span>Fly</span></span></div>
@@ -51,11 +65,13 @@ export default function Page() {
 
         <section className="toolbar" id="jogos"><div className="tabs" role="tablist">{['Todos', 'Ao vivo', 'Próximos', 'Encerrados'].map((item) => <button key={item} className={filter === item ? 'tab active' : 'tab'} onClick={() => setFilter(item)}>{item}{item === 'Ao vivo' && <span className="tab-dot" />}</button>)}</div><div className="toolbar-actions"><label className="search-box"><Search size={17} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar time ou campeonato" aria-label="Buscar time ou campeonato" />{search && <button onClick={() => setSearch('')} aria-label="Limpar busca"><X size={14} /></button>}</label><button className="filter-button"><Filter size={16} /> Filtros <ChevronDown size={15} /></button></div></section>
 
-        <div className="section-heading"><div><h2>Partidas de hoje</h2><p>Terça-feira, 29 de outubro <span>•</span> 12 jogos</p></div><button className="calendar-button"><CalendarDays size={17} /> Calendário</button></div>
-        <section className="match-grid">{visible.map((match) => <article className={`match-card ${match.state === 'Ao vivo' ? 'is-live' : ''}`} key={match.id} onClick={() => setSelectedMatch(match)} tabIndex={0} onKeyDown={(event) => { if (event.key === 'Enter') setSelectedMatch(match) }}><div className="match-meta"><span className={match.state === 'Ao vivo' ? 'status live' : match.state === 'Encerrado' ? 'status ended' : 'status upcoming'}>{match.state === 'Ao vivo' && <i />}{match.state}</span><span>{match.league}</span>{match.hot && <Flame className="hot" size={15} fill="currentColor" />}</div><div className="match-teams"><div className="club"><TeamBadge name={match.home} color={match.color} /><strong>{match.home}</strong></div><div className="score"><b>{match.homeScore ?? match.time}</b>{match.homeScore !== undefined && <span>:</span>}<b>{match.awayScore ?? ''}</b></div><div className="club away"><TeamBadge name={match.away} color={match.color} /><strong>{match.away}</strong></div></div><div className="match-footer"><span><Clock3 size={14} /> {match.state === 'Ao vivo' ? '2º tempo · 68 min' : match.state === 'Encerrado' ? 'Finalizado' : `Hoje, ${match.time}`}</span><button aria-label={`Favoritar ${match.home} e ${match.away}`}><Star size={17} /></button></div></article>)}</section>
+        <div className="section-heading"><div><h2>Partidas de hoje</h2><p>{new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date())} <span>•</span> {matches.length} jogos encontrados</p></div><button className="calendar-button"><CalendarDays size={17} /> Calendário</button></div>
+        <section className="match-grid">{visible.map((match) => { const state = statusLabel[match.status] ?? match.status; const homeScore = match.score.fullTime?.home; const awayScore = match.score.fullTime?.away; return <article className={`match-card ${state === 'Ao vivo' ? 'is-live' : ''}`} key={match.id} onClick={() => setSelectedMatch(match)} tabIndex={0} onKeyDown={(event) => { if (event.key === 'Enter') setSelectedMatch(match) }}><div className="match-meta"><span className={state === 'Ao vivo' ? 'status live' : state === 'Encerrado' ? 'status ended' : 'status upcoming'}>{state === 'Ao vivo' && <i />}{state}</span><span>{match.league}</span>{state === 'Ao vivo' && <Flame className="hot" size={15} fill="currentColor" />}</div><div className="match-teams"><div className="club"><TeamBadge team={match.home} /><strong>{match.home.name}</strong></div><div className="score"><b>{homeScore ?? formatTime(match.utcDate)}</b>{homeScore !== null && homeScore !== undefined && <span>:</span>}<b>{awayScore ?? ''}</b></div><div className="club away"><TeamBadge team={match.away} /><strong>{match.away.name}</strong></div></div><div className="match-footer"><span><Clock3 size={14} /> {state === 'Ao vivo' ? 'Em andamento' : state === 'Encerrado' ? 'Finalizado' : `Hoje, ${formatTime(match.utcDate)}`}</span><button aria-label={`Favoritar ${match.home.name} e ${match.away.name}`}><Star size={17} /></button></div></article> })}</section>
         {visible.length === 0 && <div className="empty-state">Nenhum jogo encontrado para sua busca.</div>}
 
-        <section className="updates-layout"><div className="updates-panel"><div className="section-heading compact"><div><h2>Últimas atualizações</h2><p>O que está acontecendo agora</p></div><a href="#atualizacoes">Ver tudo <span>→</span></a></div><div className="updates-list">{updates.map((update) => <div className="update-item" key={update.minute + update.title}><div className="update-time">{update.minute}</div><div className="update-line" style={{ '--update-color': update.color } as React.CSSProperties} /><div className="update-content"><span className="update-tag" style={{ color: update.color, backgroundColor: `${update.color}12` }}>{update.team}</span><h3>{update.title}</h3><p>{update.text}</p></div></div>)}</div></div><aside className="follow-card"><div className="follow-icon"><Bell size={18} /></div><h2>Não perca nenhum lance</h2><p>Receba alertas dos seus times favoritos direto no celular.</p><button>Escolher meus times <span>→</span></button></aside></section>
+        {loading && <div className="empty-state">Consultando partidas reais...</div>}
+        {error && <div className="empty-state">{error} Verifique a chave da API e tente novamente.</div>}
+        <section className="updates-layout"><div className="updates-panel"><div className="section-heading compact"><div><h2>Últimas atualizações</h2><p>Eventos retornados pela football-data.org</p></div></div><div className="updates-list">{matches.flatMap((match) => match.events.map((event) => <div className="update-item" key={`${match.id}-${event.type}-${event.minute}-${event.player}`}><div className="update-time">{event.minute ?? '—'}&apos;</div><div className="update-line" /><div className="update-content"><span className="update-tag">{event.type === 'goal' ? 'Gol' : 'Cartão'} · {event.team}</span><h3>{event.player}</h3><p>{match.home.name} x {match.away.name}</p></div></div>))}</div>{!loading && matches.every((match) => match.events.length === 0) && <p className="modal-note">Nenhum evento foi retornado pela fonte para os jogos disponíveis.</p>}</div><aside className="follow-card"><div className="follow-icon"><Bell size={18} /></div><h2>Atualização automática</h2><p>O FutFly consulta a fonte oficial a cada 30 segundos.</p><button onClick={() => window.location.reload()}>Atualizar agora <span>→</span></button></aside></section>
       </div>
       <footer><span>© 2024 FutFly</span><span>Feito para quem vive o futebol.</span><span className="footer-links"><a href="#sobre">Sobre o FutFly</a><a href="#ajuda">Ajuda</a><Settings2 size={15} /></span></footer>
     </main>
