@@ -40,16 +40,16 @@ function normalizeMatch(item: any) {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const token = process.env.API_KEY
   if (!token) return NextResponse.json({ error: 'API_KEY não configurada.' }, { status: 500 })
 
+  const fresh = new URL(request.url).searchParams.get('fresh') === '1'
   const today = new Date()
   const query = new URLSearchParams({ date: dateOnly(today), timezone: 'America/Sao_Paulo', events: 'true' })
-  const response = await fetch(`${API_BASE}/fixtures?${query}`, {
-    headers: { 'x-apisports-key': token },
-    next: { revalidate: 300 },
-  })
+  const response = await fetch(`${API_BASE}/fixtures?${query}`, fresh
+    ? { headers: { 'x-apisports-key': token }, cache: 'no-store' }
+    : { headers: { 'x-apisports-key': token }, next: { revalidate: 300 } })
 
   if (!response.ok) return NextResponse.json({ error: 'A fonte de dados recusou a consulta.' }, { status: response.status })
   const payload = await response.json()

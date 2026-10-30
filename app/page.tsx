@@ -34,9 +34,10 @@ export default function Page() {
   useEffect(() => {
     if ('Notification' in window) setNotificationStatus(Notification.permission)
 
+    const firstVisit = window.sessionStorage.getItem('futfly-first-load') !== 'done'
     const loadMatches = async () => {
       try {
-        const response = await fetch('/api/matches')
+        const response = await fetch(`/api/matches${firstVisit ? '?fresh=1' : ''}`)
         if (!response.ok) throw new Error('Não foi possível consultar os jogos.')
         const data = await response.json()
         const nextMatches = data.matches as Match[]
@@ -51,6 +52,7 @@ export default function Page() {
         }
         previousMatches.current = nextMatches
         setMatches(nextMatches)
+        if (firstVisit) window.sessionStorage.setItem('futfly-first-load', 'done')
       } catch (loadError) {
         setError(loadError instanceof Error ? loadError.message : 'Falha ao carregar partidas.')
       } finally {
