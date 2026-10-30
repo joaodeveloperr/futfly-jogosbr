@@ -20,11 +20,14 @@ export default function Page() {
   const [search, setSearch] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
   const [darkMode, setDarkMode] = useState(false)
-  const [selectedMatch, setSelectedMatch] = useState<Match | null>(null)
   const [matches, setMatches] = useState<Match[]>([])
   const [loading, setLoading] = useState(true)
   const router = useRouter()
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    setDarkMode(window.localStorage.getItem('futfly-theme') === 'dark')
+  }, [])
 
   useEffect(() => {
     const loadMatches = async () => {
@@ -53,12 +56,10 @@ export default function Page() {
 
   return (
     <main className={`app-shell ${darkMode ? 'theme-dark' : ''}`}>
-      {selectedMatch && <div className="match-modal-backdrop" role="presentation" onClick={() => setSelectedMatch(null)}><section className="match-modal" role="dialog" aria-modal="true" aria-label={`Detalhes de ${selectedMatch.home.name} e ${selectedMatch.away.name}`} onClick={(event) => event.stopPropagation()}><button className="modal-close" onClick={() => setSelectedMatch(null)} aria-label="Fechar detalhes"><X size={18} /></button><div className="modal-kicker">{statusLabel[selectedMatch.status] ?? selectedMatch.status} · {selectedMatch.league}</div><h2>{selectedMatch.home.name} <span>vs</span> {selectedMatch.away.name}</h2><div className="pitch-wrap"><div className="pitch"><div className="pitch-box top" /><div className="pitch-circle" /><div className="pitch-box bottom" /></div></div><div className="real-events"><h3>Eventos oficiais</h3>{selectedMatch.events.length ? selectedMatch.events.map((event, index) => <div className="real-event" key={`${event.type}-${event.minute}-${index}`}><strong>{event.minute ?? '—'}&apos;</strong><span>{event.type === 'goal' ? 'Gol' : event.type === 'card' ? 'Cartão' : event.type}</span><p>{event.player}{event.team ? ` · ${event.team}` : ''}</p></div>) : <p className="modal-note">A fonte oficial não retornou eventos para esta partida.</p>}</div><p className="modal-note">A football-data.org informa o minuto e o tipo do lance, mas não fornece coordenadas no campo. Por isso o mapa não inventa uma posição.</p></section></div>}
-
       <header className="topbar">
         <div className="brand"><span className="brand-mark"><Trophy size={19} strokeWidth={2.5} /></span><span>Fut<span>Fly</span></span></div>
         <nav className="main-nav" aria-label="Navegação principal"><a className="active" href="#jogos">Jogos</a><a href="#competicoes">Competições</a><a href="#times">Meus times</a></nav>
-        <div className="top-actions"><button className="icon-button" onClick={() => setDarkMode(!darkMode)} aria-label={darkMode ? 'Ativar modo claro' : 'Ativar modo escuro'}>{darkMode ? <Sun size={19} /> : <Moon size={19} />}</button><button className="icon-button" aria-label="Notificações"><Bell size={19} /></button><button className="avatar" aria-label="Perfil">MS</button><button className="mobile-menu" onClick={() => setMenuOpen(!menuOpen)} aria-label="Abrir menu"><Menu size={22} /></button></div>
+        <div className="top-actions"><button className="icon-button" onClick={() => { const nextTheme = !darkMode; setDarkMode(nextTheme); window.localStorage.setItem('futfly-theme', nextTheme ? 'dark' : 'light') }} aria-label={darkMode ? 'Ativar modo claro' : 'Ativar modo escuro'}>{darkMode ? <Sun size={19} /> : <Moon size={19} />}</button><button className="icon-button" aria-label="Notificações"><Bell size={19} /></button><button className="avatar" aria-label="Perfil">MS</button><button className="mobile-menu" onClick={() => setMenuOpen(!menuOpen)} aria-label="Abrir menu"><Menu size={22} /></button></div>
       </header>
       {menuOpen && <div className="mobile-nav"><a href="#jogos">Jogos</a><a href="#competicoes">Competições</a><a href="#times">Meus times</a></div>}
 
