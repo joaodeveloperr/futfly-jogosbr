@@ -6,7 +6,6 @@ import { Bell, CalendarDays, ChevronDown, Clock3, Filter, Flame, Menu, Moon, Sea
 
 type MatchEvent = { type: string; minute?: number; team?: string; player: string }
 type Match = { id: number; utcDate: string; status: string; home: { name: string; crest: string | null }; away: { name: string; crest: string | null }; score: { fullTime?: { home: number | null; away: number | null }; duration?: string }; league: string; events: MatchEvent[] }
-type Noticia = { noticia_id: number; titulo: string; resumo: string | null; imagem: string | null; link: string; publicado_em: string; provedor: { slug: string; nome: string; logo: string | null }; times: { time_id: number; nome_popular: string; sigla: string; escudo: string }[] }
 
 const statusLabel: Record<string, string> = { IN_PLAY: 'Ao vivo', PAUSED: 'Intervalo', FINISHED: 'Encerrado', TIMED: 'Em breve', SCHEDULED: 'Em breve' }
 
@@ -22,7 +21,6 @@ export default function Page() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [darkMode, setDarkMode] = useState(false)
   const [matches, setMatches] = useState<Match[]>([])
-  const [noticias, setNoticias] = useState<Noticia[]>([])
   const [loading, setLoading] = useState(true)
   const router = useRouter()
   const [error, setError] = useState('')
@@ -62,21 +60,8 @@ export default function Page() {
       }
     }
 
-    const loadNoticias = async () => {
-      try {
-        const response = await fetch('/api/noticias?por_pagina=6')
-        if (response.ok) {
-          const data = await response.json()
-          setNoticias(data.noticias ?? [])
-        }
-      } catch (err) {
-        console.error('Erro ao carregar notícias:', err)
-      }
-    }
-
     loadMatches()
-    loadNoticias()
-    const refresh = window.setInterval(loadMatches, 60000)
+    const refresh = window.setInterval(loadMatches, 900000)
     return () => window.clearInterval(refresh)
   }, [])
 
@@ -113,27 +98,6 @@ export default function Page() {
 
         {loading && <div className="empty-state">Consultando partidas reais...</div>}
         {error && <div className="empty-state">{error} Verifique a chave da API e tente novamente.</div>}
-
-        {noticias.length > 0 && (
-          <section className="news-section">
-            <div className="section-heading"><div><h2>Notícias</h2><p>Últimas do futebol brasileiro</p></div></div>
-            <div className="news-grid">
-              {noticias.map((noticia) => (
-                <article key={noticia.noticia_id} className="news-card" onClick={() => window.open(noticia.link, '_blank')}>
-                  {noticia.imagem && <img src={noticia.imagem} alt={noticia.titulo} className="news-image" />}
-                  <div className="news-content">
-                    <div className="news-meta">
-                      <span className="news-provider">{noticia.provedor.nome}</span>
-                      {noticia.times.length > 0 && <span className="news-teams">{noticia.times.map(t => t.sigla).join(', ')}</span>}
-                    </div>
-                    <h3 className="news-title">{noticia.titulo}</h3>
-                    {noticia.resumo && <p className="news-summary">{noticia.resumo}</p>}
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
-        )}
 
         <section className="updates-layout"><div className="updates-panel"><div className="section-heading compact"><div><h2>Últimas atualizações</h2><p>Eventos retornados pela api-futebol.com.br</p></div></div><div className="updates-list">{matches.flatMap((match) => match.events.map((event) => <div className="update-item" key={`${match.id}-${event.type}-${event.minute}-${event.player}`}><div className="update-time">{event.minute ?? '—'}&apos;</div><div className="update-line" /><div className="update-content"><span className="update-tag">{event.type === 'goal' ? 'Gol' : 'Cartão'} · {event.team}</span><h3>{event.player}</h3><p>{match.home.name} x {match.away.name}</p></div></div>))}</div>{!loading && matches.every((match) => match.events.length === 0) && <p className="modal-note">Nenhum evento foi retornado pela fonte para os jogos disponíveis.</p>}</div><aside className="follow-card"><div className="follow-icon"><Bell size={18} /></div><h2>Atualização automática</h2><p>O FutFly consulta a fonte oficial a cada 30 segundos.</p><button onClick={notificationStatus === 'granted' ? () => window.location.reload() : requestNotifications}>{notificationStatus === 'granted' ? 'Atualizar agora' : 'Ativar notificações'} <span>→</span></button></aside></section>
       </div>
